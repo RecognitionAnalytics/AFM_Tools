@@ -8,19 +8,14 @@ description = 'A set of scripts to analyze, flatten and load AFM files from a va
 name = 'pyFlammarion'
 year = "2025"
 
-
-sys.path.insert(0, realpath(dirname(__file__))+"/"+name)
+# Try to get version from _version.py
+version = "0.0.1"
 try:
-    from _version import version   
-except BaseException:
-    version = "0.0.1"
+    sys.path.insert(0, realpath(dirname(__file__))+"/"+name)
+    from _version import version
+except ImportError:
+    pass
 
-#!pip install afmformats
-#!pip install matplotlib
-#!pip install numpy
-#!pip install scipy
-#!pip install scikit-image
-#!pip install pandas
 setup(
     name=name,
     author=author,
@@ -28,30 +23,32 @@ setup(
     url='https://github.com/RecognitionAnalytics/pyFlammarion',
     version=version,
     packages=find_packages(),
-    package_dir={name: name},
+    package_data={name: ['*']},
     include_package_data=True,
     license="GPLv3",
     description=description,
     long_description=open('README.rst').read() if exists('README.rst') else '',
-    install_requires=["h5py",
-                      "igor2>=0.5.0",  # Asylum Research .ibw file format
-                      "jprops",  # JPK file format
-                      "numpy>=1.14.0",
-                      "matplotlib",
-                      "scipy",
-                      "scikit-image",
-                      "pandas",
-                      "scikit-learn",
-                      ],
+    install_requires=[
+        "h5py",
+        "igor2>=0.5.0",  # Asylum Research .ibw file format
+        "jprops",  # JPK file format
+        "numpy>=1.14.0",
+        "matplotlib",
+        "scipy",
+        "scikit-image",
+        "pandas",
+        "scikit-learn",
+    ],
     python_requires='>=3.6, <4',
-    keywords=["atomic force microscopy",
-              "flattening",
-              "break junction",
-              "mask generation",
-              "molecular imaging",
-              "force spectroscopy",
-              "agilent",
-              ],
+    keywords=[
+        "atomic force microscopy",
+        "flattening",
+        "break junction",
+        "mask generation",
+        "molecular imaging",
+        "force spectroscopy",
+        "agilent",
+    ],
     classifiers=[
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3',
@@ -59,4 +56,9 @@ setup(
         'Intended Audience :: Science/Research'
     ],
     platforms=['ALL'],
+    entry_points={
+        'console_scripts': [
+            f'{name}={name}.cli:main',
+        ],
+    },
 )
