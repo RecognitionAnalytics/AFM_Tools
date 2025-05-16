@@ -1,5 +1,7 @@
  
 from .ImagingTools import *
+from .FileTools import *
+from .MathTools import *
 
 import inspect
 import types
