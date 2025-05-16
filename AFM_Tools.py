@@ -905,6 +905,29 @@ def terraceLineFlattening(image, threshold=None, mask=None):
     # Subtract the terrace model from the original image
     return img - terrace_img
 
+def get_mi_files(folder_path, recursive=False):
+    """
+    Get all .mi files from a specified folder
+
+    Parameters:
+    -----------
+    folder_path : str
+        Path to folder containing .mi files
+    recursive : bool, optional
+        Whether to search recursively in subfolders (default: False)
+
+    Returns:
+    --------
+    list
+        List of paths to .mi files
+    """
+    if recursive:
+        pattern = os.path.join(folder_path, "**", "*.mi")
+        return glob(pattern, recursive=True)
+    else:
+        pattern = os.path.join(folder_path, "*.mi")
+        return glob(pattern)
+
 def loadMI(filename):
     size=os.path.getsize(filename)
     current=[]
@@ -1169,32 +1192,32 @@ def AFMPlot(images, show_histogram=False, **kwargs):
                 
                 # Create histogram on the second subplot
                 ax[1].set_title('Height Distribution', fontsize=12, fontweight='bold')
-                
+
                 # Calculate histogram
                 hist, bin_edges = np.histogram(img_data, bins=100, range=(vmin, vmax))
                 bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-                
+
                 # Normalize bin heights for visualization
                 hist_norm = hist / np.max(hist)
-                
+
+                # Set figure size to match or be slightly smaller than the image subplot
+                fig = ax[0].figure
+                bbox = ax[0].get_position()
+                ax[1].set_position([bbox.x0 + bbox.width * 1.05, bbox.y0, bbox.width * 0.9, bbox.height])
+
                 # Draw bars with colors from the colormap
                 for i, (x, h) in enumerate(zip(bin_centers, hist)):
                     # Normalize x to [0, 1] range for colormap
                     color_val = (x - vmin) / (vmax - vmin) if vmax > vmin else 0
                     color_val = max(0, min(1, color_val))  # Clamp to [0, 1]
                     ax[1].bar(x, hist_norm[i], width=(bin_edges[i+1] - bin_edges[i]), 
-                                color=cmap(color_val), edgecolor=cmap(color_val), alpha=0.8)
-                
+                            color=cmap(color_val), edgecolor=cmap(color_val), alpha=0.8)
+
                 ax[1].set_xlabel(f'Height ({prefix}{unit})', fontsize=12, fontweight='bold')
                 ax[1].set_ylabel('Normalized Frequency', fontsize=12, fontweight='bold')
                 ax[1].grid(True, alpha=0.3)
+
                 
-            else:
-                # Fallback if image data can't be accessed
-                ax[1].text(0.5, 0.5, "Histogram not available", 
-                            ha='center', va='center', fontsize=12, fontweight='bold')
-                ax[1].set_xticks([])
-                ax[1].set_yticks([])
         else:
             # Regular single plot without histogram
             _SinglePlot(ax, images, **kwargs)
