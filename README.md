@@ -84,6 +84,7 @@ CopyEdit
 
 `git clone https://github.com/RecognitionAnalytics/pyFlammarion.git
 cd pyFlammarion
+pip install -e .
 `
 
 * * * * *
