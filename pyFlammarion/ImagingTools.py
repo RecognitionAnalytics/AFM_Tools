@@ -16,7 +16,6 @@ from skimage.feature import canny
 from sklearn.linear_model import RANSACRegressor
 import pandas as pd
 from skimage import filters, segmentation, color, measure
-from matplotlib.pyplot import *
 import matplotlib.patches as mpatches
 from scipy import ndimage as ndi
 from skimage.segmentation import watershed
