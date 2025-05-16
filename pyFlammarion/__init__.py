@@ -1,13 +1,13 @@
  
-from .AFM_Tools import *
+from .ImagingTools import *
 
 import inspect
 import types
-from . import AFM_Tools as _tools
+from . import ImagingTools as _imaging
 
 # Automatically populate __all__ with all functions and classes from AFM_Tools
 __all__ = [
-    name for name, obj in inspect.getmembers(_tools)
+    name for name, obj in inspect.getmembers(_imaging)
     if isinstance(obj, (types.FunctionType, type))
 ]
 # Package metadata
