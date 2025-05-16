@@ -13,7 +13,7 @@ sys.path.insert(0, realpath(dirname(__file__))+"/"+name)
 try:
     from _version import version   
 except BaseException:
-    version = "unknown"
+    version = "0.0.1"
 
 #!pip install afmformats
 #!pip install matplotlib
