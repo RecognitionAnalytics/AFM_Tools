@@ -6,7 +6,7 @@ from scipy.optimize import minimize
 from skimage.filters import threshold_multiotsu
 from scipy import ndimage
 from sklearn.linear_model import RANSACRegressor
-from FileLoaders.FlammarionFile import FlammarionFile, FlammarionImageData
+from .FileLoaders.FlammarionFile import FlammarionFile, FlammarionImageData
 from scipy.signal import find_peaks
 
 class AFMFlatteningMethod(Enum):

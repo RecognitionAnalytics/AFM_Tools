@@ -7,7 +7,7 @@ from skimage.filters import threshold_otsu
 from skimage.filters import threshold_multiotsu
 from enum import Enum
 from skimage.feature import canny
-from FileLoaders.FlammarionFile import FlammarionFile, FlammarionImageData
+from .FileLoaders.FlammarionFile import FlammarionFile, FlammarionImageData
 
 class EdgeDetectionMethod(Enum):
     Sobel = 1

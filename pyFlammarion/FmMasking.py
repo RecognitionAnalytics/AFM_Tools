@@ -4,7 +4,7 @@ from scipy import ndimage
 from scipy.stats import trim_mean
 from skimage.filters import threshold_multiotsu
 from skimage.feature import canny
-from FileLoaders.FlammarionFile import FlammarionFile, FlammarionImageData
+from .FileLoaders.FlammarionFile import FlammarionFile, FlammarionImageData
 
 class EdgeDetectionMethod(Enum):
     Sobel = 1
