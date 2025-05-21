@@ -831,7 +831,7 @@ def _terrace_lineFlattening(imageData: FlammarionImageData, threshold=None, mask
     return imageData
     
     
-def _terrace_planeFlattening(imageData: FlammarionImageData, mask:np.array=None, sectionPercent=4, polyDegree=3, limitPercent=0.75):
+def _terrace_planeFlattening(imageData: FlammarionImageData, mask:np.array=None, sectionPercent=3, polyDegree=4, limitPercent=0.75):
     """
     A method to flatten the AFM image by dividing it into many sections and then using the normal of each 
     section to fit a polynomial plane to the image. This method is useful for images with terraces or steps.
@@ -840,7 +840,7 @@ def _terrace_planeFlattening(imageData: FlammarionImageData, mask:np.array=None,
         image (FlammarionImageData): 2D array of topography data
         mask (np.ndarray, optional): Boolean mask where 1 indicates good points to use for flattening.
         sectionPercent (float): The size of the sections to divide the image into, as a percentage of the image size.
-        polyDegree (int): Degree of 2D polynomial to fit (max is 3)
+        polyDegree (int): Degree of 2D polynomial to fit (max is 4)
         limitPercent (float): Percentage of the image to use for fitting the polynomial plane, used to avoid edges and spots.
         
     Returns:
@@ -924,38 +924,57 @@ def _terrace_planeFlattening(imageData: FlammarionImageData, mask:np.array=None,
     y_centers = valid_centers[:, 1]
 
     # Limit polynomial degree to max 3
-    polyDegree = min(polyDegree, 3)
-    coeffs = np.zeros((polyDegree + 1) * (polyDegree + 2) // 2)
+    polyDegree = min(polyDegree, 4)
+    # Optimize to find the best coefficients
+    # Initialize with zeros but appropriate length for the polynomial degree
+    num_coeffs = (polyDegree + 1) * (polyDegree + 2) // 2
+    initial_guess = np.zeros(num_coeffs)
 
-    #valid slopes contain the slopes that we want to fit to the slopes of our background.  
-    # We need to solve for coefficients that make the derivatives of our polynomial match the observed slopes
-    # The x-derivative of our polynomial should match valid_slopes[:, 0]
-    # The y-derivative of our polynomial should match valid_slopes[:, 1]
-    
-    # Set up the polynomial derivatives for x direction (dx/dy)
-    def poly_x_derivative(coeffs, x, y):
-        # For a 3rd degree polynomial: f(x,y) = c0 + c1*x + c2*y + c3*x^2 + c4*xy + c5*y^2 + c6*x^3 + c7*x^2*y + c8*x*y^2 + c9*y^3
-        # Derivative with respect to x is: df/dx = c1 + 2*c3*x + c4*y + 3*c6*x^2 + 2*c7*x*y + c8*y^2
-        if polyDegree >= 3:
+    if polyDegree >=4:
+        def poly_x_derivative(coeffs, x, y):
+        # For a 4th degree polynomial: f(x,y) = c0 + c1*x + c2*y + c3*x^2 + c4*xy + c5*y^2 + c6*x^3 + c7*x^2*y + c8*x*y^2 + c9*y^3 + c10*x^4 + c11*x^3*y + c12*x^2*y^2 + c13*xy^3 + c14*y^4
+        # Derivative with respect to x is: df/dx = c1 + 2*c3*x + coeffs[4]*y + 3*c6*x**2 + 2*c7*x*y + coeffs[8]*y**2 + 4*c10*x**3 + 3*c11*x**2*y + 2*c12*x*y**2 + coeffs[13]*y**3
+        
+            return (coeffs[1] +
+                   2*coeffs[3]*x + coeffs[4]*y +
+                   3*coeffs[6]*x**2 + 2*coeffs[7]*x*y +
+                   coeffs[8]*y**2 +
+                   4*coeffs[10]*x**3 +
+                   3*coeffs[11]*x**2*y +
+                   2*coeffs[12]*x*y**2 +
+                   coeffs[13]*y**3)
+        def poly_y_derivative(coeffs, x, y):
+            # Derivative with respect to y is: df/dy = c2 + coeffs[4]*x + 2*c5*y + coeffs[7]*x**2 + 3*c9*y**2 + coeffs[8]*x*y + 4*c14*y**3 + 3*c12*x*y**2 + 2*c13*x**2*y
+            return (coeffs[2] +
+                   coeffs[4]*x +
+                   2*coeffs[5]*y +
+                   coeffs[7]*x**2 +
+                   3*coeffs[9]*y**2 +
+                   coeffs[8]*x*y +
+                   4*coeffs[14]*y**3 +
+                   3*coeffs[12]*x*y**2 +
+                   2*coeffs[13]*x**2*y)
+    if polyDegree == 3:
+        def poly_x_derivative(coeffs, x, y):
+            # Derivative with respect to x is: df/dx = c1 + 2*c3*x + c4*y + 3*c6*x^2 + 2*c7*x*y + c8*y^2
             return (coeffs[1] + 
                    2*coeffs[3]*x + coeffs[4]*y + 
                    3*coeffs[6]*x**2 + 2*coeffs[7]*x*y + coeffs[8]*y**2)
-        elif polyDegree == 2:
-            return coeffs[1] + 2*coeffs[3]*x + coeffs[4]*y
-        else:  # Linear
-            return coeffs[1]
-    
-    # Set up the polynomial derivatives for y direction (dx/dy)
-    def poly_y_derivative(coeffs, x, y):
-        # Derivative with respect to y is: df/dy = c2 + c4*x + 2*c5*y + c7*x^2 + 2*c8*x*y + 3*c9*y^2
-        if polyDegree >= 3:
+        def poly_y_derivative(coeffs, x, y):
             return (coeffs[2] + 
                    coeffs[4]*x + 2*coeffs[5]*y + 
                    coeffs[7]*x**2 + 2*coeffs[8]*x*y + 3*coeffs[9]*y**2)
-        elif polyDegree == 2:
+    elif polyDegree == 2:
+        def poly_x_derivative(coeffs, x, y):
+            return coeffs[1] + 2*coeffs[3]*x + coeffs[4]*y
+        def poly_y_derivative(coeffs, x, y):
             return coeffs[2] + coeffs[4]*x + 2*coeffs[5]*y
-        else:  # Linear
+    else:  # Linear
+        def poly_x_derivative(coeffs, x, y):
+            return coeffs[1]
+        def poly_y_derivative(coeffs, x, y):
             return coeffs[2]
+    
     
     # Define error function for optimization
     def slope_error(coeffs):
@@ -970,11 +989,6 @@ def _terrace_planeFlattening(imageData: FlammarionImageData, mask:np.array=None,
         # Return sum of squared errors
         return np.sum(error_x**2 + error_y**2)
     
-    # Optimize to find the best coefficients
-    # Initialize with zeros but appropriate length for the polynomial degree
-    num_coeffs = (polyDegree + 1) * (polyDegree + 2) // 2
-    initial_guess = np.zeros(num_coeffs)
-    
     # Perform the optimization
     result = minimize(slope_error, initial_guess, method='Powell')
     coeffs = result.x
@@ -984,7 +998,13 @@ def _terrace_planeFlattening(imageData: FlammarionImageData, mask:np.array=None,
     plane = np.zeros_like(image)
     for i in range(rows):
         for j in range(cols):
-            if polyDegree >= 3:
+            if polyDegree >= 4:
+                plane[i, j] = (coeffs[0] + 
+                              coeffs[1]*j + coeffs[2]*i + 
+                              coeffs[3]*j**2 + coeffs[4]*j*i + coeffs[5]*i**2 + 
+                              coeffs[6]*j**3 + coeffs[7]*j**2*i + coeffs[8]*j*i**2 + coeffs[9]*i**3 +
+                              coeffs[10]*j**4 + coeffs[11]*j**3*i + coeffs[12]*j**2*i**2 + coeffs[13]*j*i**3 + coeffs[14]*i**4)
+            elif polyDegree == 3:
                 plane[i, j] = (coeffs[0] + 
                               coeffs[1]*j + coeffs[2]*i + 
                               coeffs[3]*j**2 + coeffs[4]*j*i + coeffs[5]*i**2 + 

@@ -144,13 +144,13 @@ def segment_afm_image_height(image: FlammarionImageData, n_classes=None, min_siz
    
     rows, cols = img_norm.shape
     # Calculate pixels per unit
-    resolution = min(rows / image.physicalSize[0], cols / image.physicalSize[1])
+    resolution = min(rows  , cols )
     # Scale kernel size based on resolution
     kernel_size = max(2, int(resolution * kernel_scale_factor))
     
     # Apply morphological operations for error correction if requested
     if morphology_cleanup:
-       regions=_morphological_cleanup(regions, kernel_size)
+       regions=_morphological_cleanup(regions,n_classes, kernel_size)
     
     # Label connected regions (some regions might still be disconnected)
     labeled_image = np.zeros_like(regions, dtype=int)
@@ -281,14 +281,14 @@ def segment_afm_image_edge(image: FlammarionImageData, method=EdgeDetectionMetho
     
     rows, cols = img_norm.shape
     # Calculate pixels per unit
-    resolution = min(rows / image.physicalSize[0], cols / image.physicalSize[1])
+    resolution = min(rows , cols )
     # Scale kernel size based on resolution
     kernel_size = max(2, int(resolution * kernel_scale_factor))
    
     
     # Apply morphological operations for error correction if requested
     if morphology_cleanup:
-        binary_edges=_morphological_cleanup(binary_edges, kernel_size)
+        binary_edges=_morphological_cleanup(binary_edges,2, kernel_size)
     
     # Label connected regions
     labeled_image, _ = ndimage.label(binary_edges)

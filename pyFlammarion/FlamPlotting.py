@@ -203,7 +203,7 @@ def _plotHistogram(ax, imageIndex:int, image: FlammarionImageData,colormap:str, 
     ax[imageIndex].grid(True, alpha=0.3)
     
 
-def AFMPlot(images:FlammarionFile|FlammarionImageData, show_histogram=False, colormap='afmhot', **kwargs):
+def AFMPlot(images:FlammarionFile|FlammarionImageData, show_histogram=False, colormap='afmhot', saveFile=None, **kwargs):
     """
     Plot a Flammarion image or a dictionary of images.
     Parameters
@@ -212,6 +212,14 @@ def AFMPlot(images:FlammarionFile|FlammarionImageData, show_histogram=False, col
         The image or dictionary of images to plot.
     show_histogram : bool, optional
         Whether to show the histogram of the image data. The default is False.
+    colormap : str, optional
+        The colormap to use for the image. Use https://matplotlib.org/stable/users/explain/colors/colormaps.html to select more exotic colormaps.
+        Reds: 'afmhot', 'hot', 'gist_heat', 'copper'
+        Grays: 'gist_yarg', 'gist_gray', 'gray'
+    saveFile : str, optional
+        The file name to save the plot. If None, the plot will not be saved. 
+        matplotlib supports saving in 'png', 'pdf', 'svg'    
+        'svg' files can be opened in vector editors like inkscape (free software) and edited.
     **kwargs : keyword arguments
         Additional arguments to pass to the plotting function.
     Returns
@@ -272,7 +280,9 @@ def AFMPlot(images:FlammarionFile|FlammarionImageData, show_histogram=False, col
             # Regular single plot without histogram
             _SinglePlot(ax, images, title,mask,segments,show_region_labels,colormap,**kwargs)
         
-    if showPlot:
+    if showPlot or saveFile is not None:
         fig.tight_layout()
         fig.subplots_adjust(hspace=0.4, wspace=0.4)
+        if saveFile is not None:
+            fig.savefig(saveFile, bbox_inches='tight', dpi=300)
         plt.show()
