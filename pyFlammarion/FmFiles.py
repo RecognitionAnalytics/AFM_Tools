@@ -1,9 +1,9 @@
 import os
 from glob import glob
 from pathlib import Path
-from FileLoaders.FlammarionFile import FlammarionFile
-from FileLoaders.gwyFile import save_to_gwy,load_gwy
-from FileLoaders.miFiles import loadMI
+from .FileLoaders.FlammarionFile import FlammarionFile
+from .FileLoaders.gwyFile import save_to_gwy,load_gwy
+from .FileLoaders.miFiles import loadMI
                             
 fileLoaders = {
     ".mi"   : loadMI,
