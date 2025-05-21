@@ -10,19 +10,21 @@ from FileLoaders.FlammarionFile import FlammarionFile, FlammarionImageData
 from scipy.signal import find_peaks
 
 class AFMFlatteningMethod(Enum):
-    Median = 1 
-    MedianOfDifference = 2
-    Modus = 3 
-    Matching = 4 
-    FacetLevelTilt = 5 
+    MedianLine = 1 
+    MedianOfDifferenceLine = 2
+    ModusLine = 3 
+    MatchingLine = 4 
+    FacetLevelTiltPlane = 5 
     PolynomialLine = 6
-    TrimmedMean = 7
-    TrimmedMeanOfDifference = 8 
+    TrimmedMeanLine = 7
+    TrimmedMeanOfDifferenceLine = 8 
     TerraceLine = 9        
     PlaneLevel=10 
-    ThreePoint=11
+    ThreePointPlane=11
     polynomialPlaneFlattening= 12
     TerracePlanes= 13 
+    Zero = 14
+    ZeroFloor = 15
 
 class RegressionMethod(Enum):
     """
@@ -32,12 +34,12 @@ class RegressionMethod(Enum):
     ABSOLUTE_DEVIATION = 'absolute_deviation'
     RANSAC = 'ransac'
 
-def trimmed_mean_lineFlattening(topography: FlammarionImageData, trim_ratio=0.1, mask:np.array=None):
+def _trimmed_mean_lineFlattening(imageData: FlammarionImageData, trim_ratio=0.1, mask:np.array=None):
     """
     Perform trimmed mean of difference flattening on an AFM image.
 
     Args:
-        topography (FlammarionImageData): Image with topography data.
+        imageData (FlammarionImageData): Image with topography data.
         trim_ratio (float): Fraction to trim from each end of the data when computing the mean.
         mask (np.ndarray, optional): Boolean mask where 1 indicates good points to use for flattening.
 
@@ -45,11 +47,10 @@ def trimmed_mean_lineFlattening(topography: FlammarionImageData, trim_ratio=0.1,
         np.ndarray: Flattened topography image.
     """
     
+    topography = imageData.data
     # Get image dimensions
     rows, _ = topography.shape
     
-    # Create an empty array for the flattened image
-    flattened_image = np.zeros_like(topography)
     
     # Process each row by subtracting the trimmed mean
     for i in range(rows):
@@ -69,29 +70,25 @@ def trimmed_mean_lineFlattening(topography: FlammarionImageData, trim_ratio=0.1,
         row_mean = trim_mean(valid_data, trim_ratio)
         
         # Subtract the mean from each row
-        flattened_image[i, :] = row_data - row_mean
+        topography[i, :] = row_data - row_mean
     
-    return flattened_image            
+    imageData.processingHistory.append(f"Trimmed mean line flattening with trim ratio {trim_ratio}")
+    return imageData            
 
-def trimmed_mean_of_difference_lineFlattening(topography: FlammarionImageData, trim_ratio=0.1, mask:np.array=None):
+def _trimmed_mean_of_difference_lineFlattening(imageData: FlammarionImageData, trim_ratio=0.1, mask:np.array=None):
     """
     Perform trimmed mean of difference flattening on an AFM image.
     
     Args:
-        topography (FlammarionImageData): Image with topography data (can be image dict or direct array)
+        imageData (FlammarionImageData): Image with topography data (can be image dict or direct array)
         trim_ratio (float): Fraction to trim from each end of the data when computing the mean.
         mask (np.ndarray, optional): Boolean mask where 1 indicates good points to use for flattening.
         
     Returns:
         dict or np.ndarray: Flattened topography image in the same format as input
     """
-    # Extract the image array if a dictionary is provided
-    if isinstance(topography, dict) and 'img' in topography:
-        img = topography['img'].copy()
-        return_dict = True
-    else:
-        img = topography.copy()
-        return_dict = False
+     
+    img = imageData.data
     
     # Get image dimensions
     rows, _ = img.shape
@@ -118,20 +115,16 @@ def trimmed_mean_of_difference_lineFlattening(topography: FlammarionImageData, t
         # Adjust the next row based on the differences
         img[i+1, :] = img[i+1, :] - diff_mean
     
-    # Return in the same format as input
-    if return_dict:
-        topography['img'] = img
-        return topography
-    else:
-        return img
+    imageData.processingHistory.append(f"Trimmed mean of difference line flattening with trim ratio {trim_ratio}")
+    return imageData    
     
-def planeLevelFlattening(image: FlammarionImageData, mask:np.array=None, fit_method=RegressionMethod.LEAST_SQUARES, ransac_min_samples=3, 
+def _planeLevelFlattening(imageData: FlammarionImageData, mask:np.array=None, fit_method=RegressionMethod.LEAST_SQUARES, ransac_min_samples=3, 
                         ransac_residual_threshold=0.01, ransac_max_trials=100, absdev_scale=1.0):
     """
     Subtract a fitted plane from an AFM topography image with different fitting methods.
     
     Args:
-        image (FlammarionImageData): 2D array of topography data
+        imageData (FlammarionImageData): 2D array of topography data
         mask (np.ndarray, optional): Boolean mask where 1 indicates good points to use for flattening.
         fit_method (str): Fitting method: 'least_squares' (MSE), 'absolute_deviation', or 'ransac'
         ransac_min_samples (int): Minimum number of samples for RANSAC fitting
@@ -143,7 +136,7 @@ def planeLevelFlattening(image: FlammarionImageData, mask:np.array=None, fit_met
         np.ndarray: Flattened image with plane subtracted
     """
     # Create a copy of the input image
-    img = image.copy()
+    img = imageData.data
     rows, cols = img.shape
     
     # Create coordinate meshgrid
@@ -170,6 +163,7 @@ def planeLevelFlattening(image: FlammarionImageData, mask:np.array=None, fit_met
     if fit_method == RegressionMethod.LEAST_SQUARES:
         # Standard least squares (minimize squared error)
         coeffs, _, _, _ = np.linalg.lstsq(A_masked, z_masked, rcond=None)
+        imageData.processingHistory.append(f"Least squares plane fitting")
     
     elif fit_method == RegressionMethod.ABSOLUTE_DEVIATION:
         # Minimize absolute deviation (more robust to outliers)
@@ -182,7 +176,7 @@ def planeLevelFlattening(image: FlammarionImageData, mask:np.array=None, fit_met
         initial_guess, _, _, _ = np.linalg.lstsq(A_masked, z_masked, rcond=None)
         result = minimize(abs_deviation, initial_guess, method='Nelder-Mead')
         coeffs = result.x
-    
+        imageData.processingHistory.append(f"Absolute deviation plane fitting")
     elif fit_method ==  RegressionMethod.RANSAC:
         # RANSAC for robust fitting
         
@@ -203,7 +197,7 @@ def planeLevelFlattening(image: FlammarionImageData, mask:np.array=None, fit_met
         a, b = ransac.estimator_.coef_
         c = ransac.estimator_.intercept_
         coeffs = [a, b, c]
-    
+        imageData.processingHistory.append(f"RANSAC plane fitting")
     else:
         raise ValueError(f"Unknown fit_method: {fit_method}. Use 'least_squares', 'absolute_deviation', or 'ransac'.")
     
@@ -212,18 +206,18 @@ def planeLevelFlattening(image: FlammarionImageData, mask:np.array=None, fit_met
     plane = a * x + b * y + c
     
     # Subtract the plane from the image
-    flattened_img = img - plane
+    imageData.data = img - plane
     
-    return flattened_img
+    return imageData
  
-def polynomialPlaneFlattening(image: FlammarionImageData, xdegree=3, ydegree=3, mask:np.array=None, fit_method=RegressionMethod.LEAST_SQUARES,
+def _polynomialPlaneFlattening(imageData: FlammarionImageData, xdegree=3, ydegree=3, mask:np.array=None, fit_method=RegressionMethod.LEAST_SQUARES,
                                 ransac_min_samples=None, ransac_residual_threshold=0.01, 
                                 ransac_max_trials=100, absdev_scale=1.0):
     """
     Subtract a polynomial surface from an AFM topography image with different fitting methods.
     
     Args:
-        image (FlammarionImageData): 2D array of topography data
+        imageData (FlammarionImageData): 2D array of topography data
         xdegree (int): Degree of polynomial in x direction (max 4)
         ydegree (int): Degree of polynomial in y direction (max 4)
         mask (np.ndarray, optional): Boolean mask where 1 indicates good points to use for flattening.
@@ -241,7 +235,7 @@ def polynomialPlaneFlattening(image: FlammarionImageData, xdegree=3, ydegree=3, 
     ydegree = min(ydegree, 4)
     
     # Create a copy of the input image
-    img = image.copy()
+    img = imageData.data
     rows, cols = img.shape
     
     # Create coordinate meshgrid
@@ -284,7 +278,7 @@ def polynomialPlaneFlattening(image: FlammarionImageData, xdegree=3, ydegree=3, 
     if fit_method == RegressionMethod.LEAST_SQUARES:
         # Standard least squares solution
         coeffs, _, _, _ = np.linalg.lstsq(A_masked, z_masked, rcond=None)
-    
+        imageData.processingHistory.append(f"Least squares polynomial plane fitting")
     elif fit_method == RegressionMethod.ABSOLUTE_DEVIATION:
         # Minimize absolute deviation (more robust to outliers)
         def abs_deviation(params):
@@ -295,7 +289,7 @@ def polynomialPlaneFlattening(image: FlammarionImageData, xdegree=3, ydegree=3, 
         initial_guess, _, _, _ = np.linalg.lstsq(A_masked, z_masked, rcond=None)
         result = minimize(abs_deviation, initial_guess, method='Nelder-Mead')
         coeffs = result.x
-    
+        imageData.processingHistory.append(f"Absolute deviation polynomial plane fitting")
     elif fit_method == RegressionMethod.RANSAC:
         # RANSAC for robust fitting
         ransac = RANSACRegressor(
@@ -311,11 +305,13 @@ def polynomialPlaneFlattening(image: FlammarionImageData, xdegree=3, ydegree=3, 
             # Add intercept to coefficients
             if hasattr(ransac.estimator_, 'intercept_'):
                 coeffs = np.concatenate([[ransac.estimator_.intercept_], coeffs])
+            imageData.processingHistory.append(f" RANSAC polynomial plane fitting")
         except Exception as e:
             # Fallback to least squares if RANSAC fails
             print(f"RANSAC failed, falling back to least squares: {e}")
             coeffs, _, _, _ = np.linalg.lstsq(A_masked, z_masked, rcond=None)
-    
+            imageData.processingHistory.append(f"Least squares polynomial plane fitting (fallback)")
+        
     else:
         raise ValueError(f"Unknown fit_method: {fit_method}. Use RegressionMethod enum.")
     
@@ -331,23 +327,23 @@ def polynomialPlaneFlattening(image: FlammarionImageData, xdegree=3, ydegree=3, 
                 term_idx += 1
     
     # Subtract the polynomial surface from the image
-    flattened_img = img - polynomial_surface
+    imageData.data = img - polynomial_surface
     
-    return flattened_img
+    return imageData
 
-def median_lineFlattening(image: FlammarionImageData, mask:np.array=None):
+def _median_lineFlattening(imageData: FlammarionImageData, mask:np.array=None):
     """
     Perform median line flattening on an AFM topography image.
     
     Args:
-        image (FlammarionImageData): 2D array of topography data
+        imageData (FlammarionImageData): 2D array of topography data
         mask (np.ndarray, optional): Boolean mask where 1 indicates good points to use for flattening.
         
     Returns:
         np.ndarray: Flattened image with median of each row subtracted
     """
     # Create a copy of the input image
-    img = image.copy()
+    img = imageData.data
     rows, _ = img.shape
     
     # Process each row by subtracting the median
@@ -364,22 +360,22 @@ def median_lineFlattening(image: FlammarionImageData, mask:np.array=None):
             
         row_median = np.median(valid_data)
         img[i, :] -= row_median
-    
-    return img
+    imageData.processingHistory.append(f"Median line flattening")
+    return imageData
         
-def modus_lineFlattening(image: FlammarionImageData, mask:np.array=None):
+def _modus_lineFlattening(imageData: FlammarionImageData, mask:np.array=None):
     """
     Perform modus (mode) flattening on an AFM topography image.
     
     Args:
-        image (FlammarionImageData): 2D array of topography data
+        imageData (FlammarionImageData): 2D array of topography data
         mask (np.ndarray, optional): Boolean mask where 1 indicates good points to use for flattening.
         
     Returns:
         np.ndarray: Flattened image with mode of each row subtracted
     """
     # Create a copy of the input image
-    img = image.copy()
+    img =  imageData.data
     rows, _ = img.shape
     
     # Process each row by subtracting the estimated mode
@@ -399,22 +395,22 @@ def modus_lineFlattening(image: FlammarionImageData, mask:np.array=None):
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         row_mode = bin_centers[np.argmax(hist)]
         img[i, :] -= row_mode
-    
-    return img
+    imageData.processingHistory.append(f"Modus line flattening")
+    return imageData
 
-def median_Of_Difference_lineFlattening(image: FlammarionImageData, mask:np.array=None):
+def _median_Of_Difference_lineFlattening(imageData: FlammarionImageData, mask:np.array=None):
     """
-    Perform median of difference flattening on an AFM topography image.
+    Perform imageData of difference flattening on an AFM topography image.
     
     Args:
-        image (FlammarionImageData): 2D array of topography data
+        imageData (FlammarionImageData): 2D array of topography data
         mask (np.ndarray, optional): Boolean mask where 1 indicates good points to use for flattening.
         
     Returns:
         np.ndarray: Flattened image using median of differences method
     """
     # Create a copy of the input image
-    img = image.copy()
+    img = imageData.data
     rows, _ = img.shape
     
     # Process each row based on differences
@@ -438,15 +434,16 @@ def median_Of_Difference_lineFlattening(image: FlammarionImageData, mask:np.arra
         
         # Adjust the next row based on the median difference
         img[i+1, :] = img[i+1, :] - diff_median
+    imageData.processingHistory.append(f"Median of difference line flattening")
     
-    return img
+    return imageData
 
-def matching_lineFlattening(image: FlammarionImageData, weight_power=2.0, mask:np.array=None):
+def _matching_lineFlattening(imageData: FlammarionImageData, weight_power=2.0, mask:np.array=None):
     """
-    Perform matching flattening on an AFM topography image.
+    Perform imageData flattening on an AFM topography image.
     
     Args:
-        image (FlammarionImageData): 2D array of topography data
+        imageData (FlammarionImageData): 2D array of topography data
         weight_power (float): Power factor for weighting flat areas more
         mask (np.ndarray, optional): Boolean mask where 1 indicates good points to use for flattening.
         
@@ -454,7 +451,7 @@ def matching_lineFlattening(image: FlammarionImageData, weight_power=2.0, mask:n
         np.ndarray: Flattened image using the matching method
     """
     # Create a copy of the input image
-    img = image.copy()
+    img = imageData.data
     rows, cols = img.shape
     
     # First pass: calculate vertical gradients for weighting
@@ -497,17 +494,17 @@ def matching_lineFlattening(image: FlammarionImageData, weight_power=2.0, mask:n
             
         # Apply the optimal shift
         img[i, :] -= optimal_shift
-    
-    return img
+    imageData.processingHistory.append(f"Matching line flattening with weight power {weight_power}")
+    return imageData
 
-def polynomial_LineFlattening(image: FlammarionImageData, degree=3, mask:np.array=None, fit_method=RegressionMethod.LEAST_SQUARES, 
+def _polynomial_LineFlattening(imageData: FlammarionImageData, degree=3, mask:np.array=None, fit_method=RegressionMethod.LEAST_SQUARES, 
                             ransac_min_samples=None, ransac_residual_threshold=0.01, 
                             ransac_max_trials=100, absdev_scale=1.0):
     """
     Perform polynomial flattening on an AFM topography image.
     
     Args:
-        image (FlammarionImageData): 2D array of topography data
+        imageData (FlammarionImageData): 2D array of topography data
         degree (int): Degree of the polynomial fit
         mask (np.ndarray, optional): Boolean mask where 1 indicates good points to use for flattening.
         fit_method (str): Fitting method: 'least_squares' (MSE), 'absolute_deviation', or 'ransac'
@@ -520,7 +517,7 @@ def polynomial_LineFlattening(image: FlammarionImageData, degree=3, mask:np.arra
         np.ndarray: Flattened image with polynomial background subtracted
     """
     # Create a copy of the input image
-    img = image.copy()
+    img = imageData.data
     rows, cols = img.shape
     
     # Create coordinate meshgrid
@@ -555,6 +552,7 @@ def polynomial_LineFlattening(image: FlammarionImageData, degree=3, mask:np.arra
             # Standard least squares polynomial fit
             coeffs = np.polyfit(valid_x, valid_data, degree)
             polynomial = np.polyval(coeffs, x)
+            imageData.processingHistory.append(f"Least squares polynomial line flattening")
             
         elif fit_method ==  RegressionMethod.ABSOLUTE_DEVIATION:
             # Define function to minimize absolute deviation
@@ -575,7 +573,7 @@ def polynomial_LineFlattening(image: FlammarionImageData, degree=3, mask:np.arra
             polynomial = np.zeros_like(x, dtype=float)
             for j, coeff in enumerate(result.x):
                 polynomial += coeff * x**(degree-j)
-                
+            imageData.processingHistory.append(f"Absolute deviation polynomial line flattening")
         elif fit_method == RegressionMethod.RANSAC:
             # Prepare data for RANSAC
             X = valid_x.reshape(-1, 1)
@@ -597,10 +595,12 @@ def polynomial_LineFlattening(image: FlammarionImageData, degree=3, mask:np.arra
                 # Generate the polynomial for all x values
                 X_full = np.vander(x, degree+1)
                 polynomial = ransac.predict(X_full)
+                imageData.processingHistory.append(f"RANSAC polynomial line flattening")
             except:
                 # Fallback to least squares if RANSAC fails
                 coeffs = np.polyfit(valid_x, valid_data, degree)
                 polynomial = np.polyval(coeffs, x)
+                imageData.processingHistory.append(f"Least squares polynomial line flattening (fallback)")
         
         else:
             raise ValueError(f"Unknown fit_method: {fit_method}. Use 'least_squares', 'absolute_deviation', or 'ransac'.")
@@ -608,14 +608,14 @@ def polynomial_LineFlattening(image: FlammarionImageData, degree=3, mask:np.arra
         # Subtract the polynomial from the row
         img[i, :] -= polynomial
     
-    return img
+    return imageData
 
-def three_Point_planeFlattening(image: FlammarionImageData, p1, p2, p3, mask:np.array=None):
+def _three_Point_planeFlattening(imageData: FlammarionImageData, p1, p2, p3, mask:np.array=None):
     """
     Perform three-point plane leveling on an AFM topography image.
     
     Args:
-        image (FlammarionImageData): 2D array of topography data
+        imageData (FlammarionImageData): 2D array of topography data
         p1, p2, p3: Three points to define the plane
         mask (np.ndarray, optional): Boolean mask where 1 indicates good points to use for flattening.
             If provided, plane is fit to all good points instead of just 3 points.
@@ -623,12 +623,12 @@ def three_Point_planeFlattening(image: FlammarionImageData, p1, p2, p3, mask:np.
     Returns:
         np.ndarray: Flattened image with plane defined by three corners subtracted
     """
-    img = image.copy()
+    img = imageData.data
     rows, cols = img.shape
     
     # If mask is provided, use planeLevelFlattening instead (which supports masks)
     if mask is not None:
-        return planeLevelFlattening(img, mask=mask)
+        return _planeLevelFlattening(img, mask=mask)
     
     # Otherwise, continue with three-point method
     p1 = (p1[0], p1[1], img[p1[0], p1[1]])
@@ -652,23 +652,23 @@ def three_Point_planeFlattening(image: FlammarionImageData, p1, p2, p3, mask:np.
     
     # Calculate the plane at each point (z = -(Ax + By + D) / C)
     plane = -(A*x + B*y + D) / C if C != 0 else np.zeros_like(img)
-    
-    # Subtract the plane from the image
-    return img - plane
+    imageData.data = img - plane  # Subtract the plane from the image
+    imageData.processingHistory.append(f"Three-point plane flattening with points {p1}, {p2}, {p3}")
+    return imageData
 
 
-def facet_Level_Tilt_planeFlattening(image: FlammarionImageData, mask:np.array=None):
+def _facet_Level_Tilt_planeFlattening(imageData: FlammarionImageData, mask:np.array=None):
     """
     Perform facet level tilt flattening on an AFM topography image.
     
     Args:
-        image (FlammarionImageData): 2D array of topography data
+        imageData (FlammarionImageData): 2D array of topography data
         mask (np.ndarray, optional): Boolean mask where 1 indicates good points to use for flattening.
         
     Returns:
         np.ndarray: Flattened image with optimal facet-preserving plane subtracted
     """
-    img = image.copy()
+    img = imageData.data
     rows, cols = img.shape
     
     # Create coordinate meshgrid
@@ -739,15 +739,16 @@ def facet_Level_Tilt_planeFlattening(image: FlammarionImageData, mask:np.array=N
     # Create the plane for all points
     plane = a * x + b * y + c
     
-    # Subtract the plane from the image
-    return img - plane
+    imageData.data = img - plane  # Subtract the plane from the image
+    imageData.processingHistory.append(f"Facet level tilt plane flattening with gradients {dominant_dx}, {dominant_dy}")
+    return imageData
 
-def terrace_lineFlattening(image: FlammarionImageData, threshold=None, mask:np.array=None):
+def _terrace_lineFlattening(imageData: FlammarionImageData, threshold=None, mask:np.array=None):
     """
     Perform terrace flattening on an AFM topography image by identifying horizontal terraces.
     
     Args:
-        image (FlammarionImageData): 2D array of topography data
+        imageData (FlammarionImageData): 2D array of topography data
         threshold (float, optional): Threshold for determining terraces, if None it's calculated automatically
         mask (np.ndarray, optional): Boolean mask where 1 indicates good points to use for flattening.
         
@@ -756,7 +757,7 @@ def terrace_lineFlattening(image: FlammarionImageData, threshold=None, mask:np.a
     """
     
     # Create a copy of the input image
-    img = image.copy()
+    img = imageData.data
     rows, cols = img.shape
     
     # Apply mask to image for processing if provided
@@ -793,10 +794,7 @@ def terrace_lineFlattening(image: FlammarionImageData, threshold=None, mask:np.a
     else:
         terrace_mask = local_std < threshold
     
-    # Create a grid of sample points
-    x_grid = np.linspace(0, cols-1, min(20, cols))
-    y_grid = np.linspace(0, rows-1, min(20, rows))
-    X, Y = np.meshgrid(x_grid, y_grid)
+     
     
     # Create meshgrid for all points
     x, y = np.meshgrid(np.arange(cols), np.arange(rows))
@@ -828,16 +826,12 @@ def terrace_lineFlattening(image: FlammarionImageData, threshold=None, mask:np.a
     terrace_img = a * x + b * y + c
     
     # Subtract the terrace model from the original image
-    return img - terrace_img
+    imageData.data = img - terrace_img
+    imageData.processingHistory.append(f"Terrace line flattening with threshold {threshold}")
+    return imageData
     
     
-    
-    
-    
-    
-    
-    
-def terrace_planeFlattening(imageData: FlammarionImageData, mask:np.array=None, sectionPercent=4, polyDegree=3, limitPercent=0.75):
+def _terrace_planeFlattening(imageData: FlammarionImageData, mask:np.array=None, sectionPercent=4, polyDegree=3, limitPercent=0.75):
     """
     A method to flatten the AFM image by dividing it into many sections and then using the normal of each 
     section to fit a polynomial plane to the image. This method is useful for images with terraces or steps.
@@ -1021,37 +1015,43 @@ def FlattenImage(imagePack: FlammarionImageData| FlammarionFile, flattenMethod=A
     # Ensure mask is passed to the flattening function if provided
     if mask is not None:
         kwargs['mask'] = mask
-    
-    if flattenMethod == AFMFlatteningMethod.PlaneLevel:
-        topography = planeLevelFlattening(imagePack['img'], **kwargs)
-    elif flattenMethod == AFMFlatteningMethod.Median:
-        topography = median_lineFlattening(imagePack['img'], **kwargs)
-    elif flattenMethod == AFMFlatteningMethod.TrimmedMean:
-        topography = _trimmed_mean_flattening(imagePack['img'], **kwargs)
-    elif flattenMethod == AFMFlatteningMethod.TrimmedMeanOfDifference:
-        topography = trimmed_mean_of_difference_lineFlattening(imagePack['img'], **kwargs)
-    elif flattenMethod == AFMFlatteningMethod.MedianOfDifference:
-        topography = median_Of_Difference_lineFlattening(imagePack['img'], **kwargs)
-    elif flattenMethod == AFMFlatteningMethod.Modus:
-        topography = modus_lineFlattening(imagePack['img'], **kwargs)
-    elif flattenMethod == AFMFlatteningMethod.Matching:
-        topography = matching_lineFlattening(imagePack['img'], **kwargs)
-    elif flattenMethod == AFMFlatteningMethod.PolynomialLine:
-        topography = polynomial_LineFlattening(imagePack['img'], **kwargs)
-    elif flattenMethod == AFMFlatteningMethod.TerraceLine:
-        topography = terrace_lineFlattening(imagePack['img'], **kwargs)
-    elif flattenMethod == AFMFlatteningMethod.FacetLevelTilt:
-        topography = facet_Level_Tilt_planeFlattening(imagePack['img'], **kwargs)
-    elif flattenMethod == AFMFlatteningMethod.ThreePoint:
-        topography = three_Point_planeFlattening(imagePack['img'], **kwargs)
-    elif flattenMethod == AFMFlatteningMethod.polynomialPlaneFlattening:
-        topography = polynomialPlaneFlattening(imagePack['img'], **kwargs)
-    elif flattenMethod == AFMFlatteningMethod.TerracePlanes:
-        topography = terrace_planeFlattening(imagePack['img'], **kwargs)
+    if isinstance(imagePack, FlammarionFile):
+        for key in imagePack:
+            imagePack[key] = FlattenImage(imagePack[key], flattenMethod, mask, **kwargs)
+    elif  isinstance(imagePack, FlammarionImageData):
+        if flattenMethod == AFMFlatteningMethod.PlaneLevel:
+            imagePack = _planeLevelFlattening(imagePack , **kwargs)
+        elif flattenMethod == AFMFlatteningMethod.MedianLine:
+            imagePack = _median_lineFlattening(imagePack, **kwargs)
+        elif flattenMethod == AFMFlatteningMethod.TrimmedMeanLine:
+            imagePack = _trimmed_mean_lineFlattening(imagePack, **kwargs)
+        elif flattenMethod == AFMFlatteningMethod.TrimmedMeanOfDifferenceLine:
+            imagePack = _trimmed_mean_of_difference_lineFlattening(imagePack, **kwargs)
+        elif flattenMethod == AFMFlatteningMethod.MedianOfDifferenceLine:
+            imagePack = _median_Of_Difference_lineFlattening(imagePack, **kwargs)
+        elif flattenMethod == AFMFlatteningMethod.ModusLine:
+            imagePack = _modus_lineFlattening(imagePack, **kwargs)
+        elif flattenMethod == AFMFlatteningMethod.MatchingLine:
+            imagePack = _matching_lineFlattening(imagePack, **kwargs)
+        elif flattenMethod == AFMFlatteningMethod.PolynomialLine:
+            imagePack = _polynomial_LineFlattening(imagePack, **kwargs)
+        elif flattenMethod == AFMFlatteningMethod.TerraceLine:
+            imagePack = _terrace_lineFlattening(imagePack, **kwargs)
+        elif flattenMethod == AFMFlatteningMethod.FacetLevelTiltPlane:
+            imagePack = _facet_Level_Tilt_planeFlattening(imagePack, **kwargs)
+        elif flattenMethod == AFMFlatteningMethod.ThreePointPlane:
+            imagePack = _three_Point_planeFlattening(imagePack, **kwargs)
+        elif flattenMethod == AFMFlatteningMethod.polynomialPlaneFlattening:
+            imagePack = _polynomialPlaneFlattening(imagePack, **kwargs)
+        elif flattenMethod == AFMFlatteningMethod.TerracePlanes:
+            imagePack = _terrace_planeFlattening(imagePack, **kwargs)
+        elif flattenMethod == AFMFlatteningMethod.Zero:
+            imagePack = ZeroImage(imagePack, **kwargs)
+        elif flattenMethod == AFMFlatteningMethod.ZeroImageToFloor:
+            imagePack = ZeroImageToFloor(imagePack, **kwargs)
 
     # Copy imagepack to a new variable, then add the flattened image
-    imagePack = imagePack.copy()
-    imagePack['img'] = topography    
+     
     return imagePack
 
 
