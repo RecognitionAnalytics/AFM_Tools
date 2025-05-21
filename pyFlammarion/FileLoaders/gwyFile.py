@@ -9,7 +9,7 @@ from .FileUtils import write_null_terminated_string, write_uint32, write_char, w
 from .FileUtils import read_null_terminated_string, read_uint32, read_char, read_double
 import numpy as np
 import re
-import struct 
+
 
 def save_to_gwy(image: 'FlammarionFile', file_path: Union[Path, str], verbose=False) -> None:
     """
@@ -147,6 +147,17 @@ def _write_gwy_object(file: BinaryIO, data_dict: Dict[str, Any]) -> None:
 
     # Calculate data size by writing to a temporary buffer first
     import io
+
+    temp_buffer = io.BytesIO()
+    for key, value in data_dict.items():
+        _write_gwy_component(temp_buffer, key, value)
+
+    # Write the data size
+    data_size = temp_buffer.tell()
+    write_uint32(file, data_size)
+
+    # Write the actual data
+    file.write(temp_buffer.getvalue())
  
 
 def load_gwy(file_path: Path | str ) -> FlammarionFile:

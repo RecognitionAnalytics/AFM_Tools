@@ -2,14 +2,14 @@ import os
 from glob import glob
 from pathlib import Path
 from FileLoaders.FlammarionFile import FlammarionFile
-from FileLoaders.gwyFile import save_to_gwy
+from FileLoaders.gwyFile import save_to_gwy,load_gwy
 from FileLoaders.miFiles import loadMI
                             
 fileLoaders = {
     ".mi"   : loadMI,
     ".ibw"  : None,
     ".jpk"  : None,
-    ".gwy"  : None,
+    ".gwy"  : load_gwy,
 }                            
 
 fileSavers = {
