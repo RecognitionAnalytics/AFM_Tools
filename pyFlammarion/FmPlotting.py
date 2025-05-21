@@ -130,11 +130,11 @@ def _SinglePlot(ax:any, imagePack:FlammarionImageData, title:str, mask:np.array,
         # Create a red overlay for masked areas
         mask_overlay = np.zeros((mask.shape[0], mask.shape[1], 4))
         mask_overlay[mask == 0, 0] = 1  # Red channel
-        mask_overlay[mask == 0, 3] = 0.5  # Alpha channel (transparency)
+        mask_overlay[mask == 0, 3] = 0.8  # Alpha channel (transparency)
         
         # Add the overlay to the image
-        ax.imshow(mask_overlay, extent=[0, iWidth * scaleXY, 0, iHeight * scaleXY], 
-                    interpolation='nearest', origin='lower')
+        ax.imshow(mask_overlay, extent=[0, iWidth * scaleXY, iHeight * scaleXY, 0], 
+                    interpolation='nearest', origin='upper' )
     
     # Add colored segment outlines if 'segments' is provided
     if segments is not None:

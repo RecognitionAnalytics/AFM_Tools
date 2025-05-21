@@ -2,21 +2,21 @@ import os
 from glob import glob
 from pathlib import Path
 from .FileLoaders.FlammarionFile import FlammarionFile
-from .FileLoaders.gwyFile import save_to_gwy,load_gwy
-from .FileLoaders.miFiles import loadMI
+from .FileLoaders.gwyFile import save_to_gwy as _save_to_gwy,load_gwy as _load_gwy
+from .FileLoaders.miFiles import loadMI as _loadMI
                             
 fileLoaders = {
-    ".mi"   : loadMI,
+    ".mi"   : _loadMI,
     ".ibw"  : None,
     ".jpk"  : None,
-    ".gwy"  : load_gwy,
+    ".gwy"  : _load_gwy,
 }                            
 
 fileSavers = {
     ".mi"   : None,
     ".ibw"  : None,
     ".jpk"  : None,
-    ".gwy"  : save_to_gwy,
+    ".gwy"  : _save_to_gwy,
 }
 
 def knownLoadFileTypes():
@@ -43,7 +43,7 @@ def knownSaveFileTypes():
     
 
  
-def loadFile(filename, verbose=False):
+def loadFile(filename:str|Path, verbose:bool=False)->FlammarionFile:
     """
     Load an afm file and return a dictionary with the data and parameters
     Parameters
@@ -73,7 +73,7 @@ def loadFile(filename, verbose=False):
     raise ValueError("File type not supported")
 
     
-def saveFile(filename, data: FlammarionFile, verbose=False):
+def saveFile(filename:str|Path, data: FlammarionFile, verbose:bool=False):
     """
     Save a file with the given data
     Parameters

@@ -176,3 +176,6 @@ AFM_Analysis_8nm StandingFilms examples NoProtein.ipynb
 AFMTerraceLevel.ipynb
 GetTerraces 2.ipynb
 GetTerraces.ipynb
+*.svg
+test.ipynb
+test.gwy

@@ -165,14 +165,15 @@ def _streakMask(imagePack: FlammarionImageData, scan_direction='horizontal', std
     
     return mask
 
-def _trimmedMeanMask(imagePack: FlammarionImageData, trim_factor=3.0):
+
+def _trimmedMeanMask(imagePack: FlammarionImageData, trim_factor=.1, MAD_factor=3):
     """
     Generate a mask that excludes points that are far from the trimmed mean.
     
     Args:
         image (np.ndarray): 2D array of topography data
-        trim_factor (float): Factor multiplied by MAD to determine outlier threshold
-        **kwargs: Additional parameters (unused)
+        trim_factor (float):  Percentage of data to trim from top and bottom
+        MAD_factor (float): Multiplicative Factor to determine upper/lower thresholds based on Median Absolute Deviation
     
     Returns:
         np.ndarray: Boolean mask where 1 indicates good points to use for flattening
@@ -180,15 +181,15 @@ def _trimmedMeanMask(imagePack: FlammarionImageData, trim_factor=3.0):
     image = imagePack.data
     # Calculate trimmed mean (removing 10% from top and bottom)
     flat_img = image.flatten()
-    trimmed_mean = trim_mean(flat_img, 0.1)
+    trimmed_mean = trim_mean(flat_img,trim_factor)
     
     # Calculate Median Absolute Deviation (MAD) - robust measure of dispersion
     median = np.median(flat_img)
     mad = np.median(np.abs(flat_img - median))
     
     # Define upper and lower thresholds based on MAD
-    upper_threshold = trimmed_mean + trim_factor * mad
-    lower_threshold = trimmed_mean - trim_factor * mad
+    upper_threshold = trimmed_mean + MAD_factor * mad
+    lower_threshold = trimmed_mean - MAD_factor * mad
     
     # Create mask
     mask = np.ones_like(image)
