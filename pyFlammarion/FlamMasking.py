@@ -4,6 +4,7 @@ from scipy import ndimage
 from scipy.stats import trim_mean
 from skimage.filters import threshold_multiotsu
 from skimage.feature import canny
+from FileLoaders.FlammarionFile import FlammarionFile, FlammarionImageData
 
 class EdgeDetectionMethod(Enum):
     Sobel = 1
@@ -11,7 +12,7 @@ class EdgeDetectionMethod(Enum):
     Roberts = 3    
     Canny =4 
     
-class AFMMaskGenerator(Enum):
+class AFMMaskMethods(Enum):
     HighPoints = 1  # Remove regions that are too high
     StreakMask = 13  # Detect scan-direction streaks caused by persistent tip damage or contamination
     TrimmedMean = 3  # Mask the points that are well out of the normal from the image
@@ -23,42 +24,8 @@ class AFMMaskGenerator(Enum):
     SharpEdges = 12  # Mask sharp edges or features that are not smooth
 
 
-def AutoMask(image, method=AFMMaskGenerator.Unsmoothable, **kwargs):    
-    """
-    Generate a mask for AFM image flattening using the specified method.
-    Args:
-        image (np.ndarray): 2D array of topography data
-        method (AFMMaskGenerator): Method to use for generating the mask
-        **kwargs: Additional parameters specific to the mask generation method
-    Returns:
-        np.ndarray: Boolean mask where 1 indicates good points to use for flattening
-    """
-    
-    if 'img' in image:
-        image = image['img']
-        
-    if method == AFMMaskGenerator.HighPoints:
-        mask = highPointsMask(image, **kwargs)
-    elif method == AFMMaskGenerator.StreakMask:
-        mask = streakMask(image, **kwargs)
-    elif method == AFMMaskGenerator.TrimmedMean:
-        mask = trimmedMeanMask(image, **kwargs)
-    elif method == AFMMaskGenerator.ParticleDetection:
-        mask = particleDetectionMask(image, **kwargs)
-    elif method == AFMMaskGenerator.Unsmoothable:
-        mask = unsmoothableMask(image, **kwargs)
-    elif method == AFMMaskGenerator.EdgeArtifacts:
-        mask = edgeArtifactsMask(image, **kwargs)
-    elif method == AFMMaskGenerator.SpikeArtifacts:
-        mask = spikeArtifactsMask(image, **kwargs)
-    elif method == AFMMaskGenerator.LowPoints:
-        mask = lowPointsMask(image, **kwargs)
-    elif method == AFMMaskGenerator.SharpEdges:
-        mask = sharpEdgesMask(image, **kwargs)
-    
-    return mask
 
-def sharpEdgesMask(image, threshold_factor=1.0, filter_method=EdgeDetectionMethod.Sobel):
+def _sharpEdgesMask(imagePack: FlammarionImageData, threshold_factor=1.0, filter_method=EdgeDetectionMethod.Sobel):
     """
     Generate a mask that excludes sharp edges where the slope is higher than a threshold.
     
@@ -71,6 +38,7 @@ def sharpEdgesMask(image, threshold_factor=1.0, filter_method=EdgeDetectionMetho
     Returns:
         np.ndarray: Boolean mask where 1 indicates good points to use for flattening
     """
+    image = imagePack.data
     # Apply gradient filter based on specified method
     if filter_method  == EdgeDetectionMethod.Prewitt:
         grad_x = ndimage.prewitt(image, axis=1)
@@ -94,7 +62,7 @@ def sharpEdgesMask(image, threshold_factor=1.0, filter_method=EdgeDetectionMetho
     
     return mask
 
-def highPointsMask(image, threshold_percentile=90):
+def _highPointsMask(imagePack: FlammarionImageData, threshold_percentile=90):
     """
     Generate a mask that excludes high points above a percentile threshold.
     
@@ -106,6 +74,7 @@ def highPointsMask(image, threshold_percentile=90):
     Returns:
         np.ndarray: Boolean mask where 1 indicates good points to use for flattening
     """
+    image = imagePack.data
     # Calculate the threshold height based on percentile
     threshold = np.percentile(image, threshold_percentile)
     
@@ -114,7 +83,7 @@ def highPointsMask(image, threshold_percentile=90):
     
     return mask
 
-def lowPointsMask(image, threshold_percentile=10):
+def _lowPointsMask(imagePack: FlammarionImageData, threshold_percentile=10):
     """
     Generate a mask that excludes low points below a percentile threshold.
     
@@ -126,6 +95,7 @@ def lowPointsMask(image, threshold_percentile=10):
     Returns:
         np.ndarray: Boolean mask where 1 indicates good points to use for flattening
     """
+    image = imagePack.data
     # Calculate the threshold height based on percentile
     threshold = np.percentile(image, threshold_percentile)
     
@@ -134,7 +104,7 @@ def lowPointsMask(image, threshold_percentile=10):
     
     return mask
 
-def streakMask(image, scan_direction='horizontal', std_threshold=2.0, min_length=10):
+def _streakMask(imagePack: FlammarionImageData, scan_direction='horizontal', std_threshold=2.0, min_length=10):
     """
     Generate a mask that excludes scan-direction streaks caused by tip damage or contamination.
     
@@ -148,6 +118,7 @@ def streakMask(image, scan_direction='horizontal', std_threshold=2.0, min_length
     Returns:
         np.ndarray: Boolean mask where 1 indicates good points to use for flattening
     """
+    image = imagePack.data
     # Create initial mask with all points marked as good
     rows, cols = image.shape
     mask = np.ones_like(image)
@@ -194,7 +165,7 @@ def streakMask(image, scan_direction='horizontal', std_threshold=2.0, min_length
     
     return mask
 
-def trimmedMeanMask(image, trim_factor=3.0):
+def _trimmedMeanMask(imagePack: FlammarionImageData, trim_factor=3.0):
     """
     Generate a mask that excludes points that are far from the trimmed mean.
     
@@ -206,6 +177,7 @@ def trimmedMeanMask(image, trim_factor=3.0):
     Returns:
         np.ndarray: Boolean mask where 1 indicates good points to use for flattening
     """
+    image = imagePack.data
     # Calculate trimmed mean (removing 10% from top and bottom)
     flat_img = image.flatten()
     trimmed_mean = trim_mean(flat_img, 0.1)
@@ -225,7 +197,7 @@ def trimmedMeanMask(image, trim_factor=3.0):
     
     return mask
 
-def particleDetectionMask(image, threshold_method='otsu', min_size=10, **kwargs):
+def _particleDetectionMask(imagePack: FlammarionImageData, threshold_method='otsu', min_size=10, **kwargs):
     """
     Generate a mask that excludes particles (features that stand out from background).
     
@@ -238,6 +210,7 @@ def particleDetectionMask(image, threshold_method='otsu', min_size=10, **kwargs)
     Returns:
         np.ndarray: Boolean mask where 1 indicates good points to use for flattening
     """
+    image = imagePack.data
     # Determine threshold
     if threshold_method.lower() == 'otsu':
         try:
@@ -264,7 +237,7 @@ def particleDetectionMask(image, threshold_method='otsu', min_size=10, **kwargs)
             
     return mask
 
-def unsmoothableMask(image, filter_size=5, threshold_factor=2.0):
+def _unsmoothableMask(imagePack: FlammarionImageData, filter_size=5, threshold_factor=2.0):
     """
     Generate a mask that excludes areas that don't smooth well (sharp features).
     
@@ -277,6 +250,7 @@ def unsmoothableMask(image, filter_size=5, threshold_factor=2.0):
     Returns:
         np.ndarray: Boolean mask where 1 indicates good points to use for flattening
     """
+    image = imagePack.data
     # Apply Gaussian filter for smoothing
     smoothed = ndimage.gaussian_filter(image, sigma=filter_size/6)
     
@@ -292,7 +266,7 @@ def unsmoothableMask(image, filter_size=5, threshold_factor=2.0):
     
     return mask
 
-def edgeArtifactsMask(image, edge_width=5, method=EdgeDetectionMethod.Sobel, threshold=0.5, **kwargs):
+def _edgeArtifactsMask(imagePack: FlammarionImageData, edge_width=5, method=EdgeDetectionMethod.Sobel, threshold=0.5, **kwargs):
     """
     Generate a mask that excludes the edges of the image and detected features edges.
     
@@ -306,6 +280,7 @@ def edgeArtifactsMask(image, edge_width=5, method=EdgeDetectionMethod.Sobel, thr
     Returns:
         np.ndarray: Boolean mask where 1 indicates good points to use for flattening
     """
+    image = imagePack.data
     rows, cols = image.shape
     mask = np.ones_like(image)
     
@@ -353,7 +328,7 @@ def edgeArtifactsMask(image, edge_width=5, method=EdgeDetectionMethod.Sobel, thr
     
     return mask
 
-def spikeArtifactsMask(image, threshold_sigma=5.0, neighborhood_size=3):
+def _spikeArtifactsMask(imagePack: FlammarionImageData, threshold_sigma=5.0, neighborhood_size=3):
     """
     Generate a mask that excludes spike artifacts (isolated extreme values).
     
@@ -366,6 +341,7 @@ def spikeArtifactsMask(image, threshold_sigma=5.0, neighborhood_size=3):
     Returns:
         np.ndarray: Boolean mask where 1 indicates good points to use for flattening
     """
+    image = imagePack.data
     # Create initial mask with all points marked as good
     mask = np.ones_like(image)
     
@@ -400,3 +376,33 @@ def spikeArtifactsMask(image, threshold_sigma=5.0, neighborhood_size=3):
     
     return mask
     
+ 
+mask_functions = {
+    AFMMaskMethods.HighPoints: _highPointsMask,
+    AFMMaskMethods.StreakMask: _streakMask,
+    AFMMaskMethods.TrimmedMean: _trimmedMeanMask,
+    AFMMaskMethods.ParticleDetection: _particleDetectionMask,
+    AFMMaskMethods.Unsmoothable: _unsmoothableMask,
+    AFMMaskMethods.EdgeArtifacts: _edgeArtifactsMask,
+    AFMMaskMethods.SpikeArtifacts: _spikeArtifactsMask,
+    AFMMaskMethods.LowPoints: _lowPointsMask,
+    AFMMaskMethods.SharpEdges: _sharpEdgesMask
+}    
+
+def MaskImage(imagePack: FlammarionImageData , maskMethod=AFMMaskMethods.Unsmoothable, **kwargs) ->np.array:    
+    """
+    Generate a mask for AFM image flattening using the specified method.
+    Args:
+        image (np.ndarray): 2D array of topography data
+        method (AFMMaskGenerator): Method to use for generating the mask
+        **kwargs: Additional parameters specific to the mask generation method
+    Returns:
+        np.ndarray: Boolean mask where 1 indicates good points to use for flattening
+    """
+    # Look up the appropriate function and call it with the image and kwargs
+    if maskMethod in mask_functions:
+        mask = mask_functions[maskMethod](imagePack, **kwargs)
+    else:
+        raise ValueError(f"Unsupported mask method: {maskMethod}")
+    
+    return mask    

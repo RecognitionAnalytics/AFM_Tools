@@ -998,61 +998,7 @@ def _terrace_planeFlattening(imageData: FlammarionImageData, mask:np.array=None,
     imageData.processingHistory.append(f"TerracePlaneFlattening: Subtracted polynomial plane from image.")
     imageData.data = image - plane
     return imageData
-    
-def FlattenImage(imagePack: FlammarionImageData| FlammarionFile, flattenMethod=AFMFlatteningMethod.PlaneLevel, mask=None, **kwargs):
-    """
-    Apply flattening to an AFM image using the specified method.
-    
-    Args:
-        imagePack (dict): Dictionary containing the AFM image data
-        flattenMethod (AFMFlatteningMethod): Method to use for flattening
-        mask (np.ndarray, optional): Boolean mask where 1 indicates good points to use for flattening
-        **kwargs: Additional parameters specific to the flattening method
-    
-    Returns:
-        dict: Copy of imagePack with flattened image
-    """
-    # Ensure mask is passed to the flattening function if provided
-    if mask is not None:
-        kwargs['mask'] = mask
-    if isinstance(imagePack, FlammarionFile):
-        for key in imagePack:
-            imagePack[key] = FlattenImage(imagePack[key], flattenMethod, mask, **kwargs)
-    elif  isinstance(imagePack, FlammarionImageData):
-        if flattenMethod == AFMFlatteningMethod.PlaneLevel:
-            imagePack = _planeLevelFlattening(imagePack , **kwargs)
-        elif flattenMethod == AFMFlatteningMethod.MedianLine:
-            imagePack = _median_lineFlattening(imagePack, **kwargs)
-        elif flattenMethod == AFMFlatteningMethod.TrimmedMeanLine:
-            imagePack = _trimmed_mean_lineFlattening(imagePack, **kwargs)
-        elif flattenMethod == AFMFlatteningMethod.TrimmedMeanOfDifferenceLine:
-            imagePack = _trimmed_mean_of_difference_lineFlattening(imagePack, **kwargs)
-        elif flattenMethod == AFMFlatteningMethod.MedianOfDifferenceLine:
-            imagePack = _median_Of_Difference_lineFlattening(imagePack, **kwargs)
-        elif flattenMethod == AFMFlatteningMethod.ModusLine:
-            imagePack = _modus_lineFlattening(imagePack, **kwargs)
-        elif flattenMethod == AFMFlatteningMethod.MatchingLine:
-            imagePack = _matching_lineFlattening(imagePack, **kwargs)
-        elif flattenMethod == AFMFlatteningMethod.PolynomialLine:
-            imagePack = _polynomial_LineFlattening(imagePack, **kwargs)
-        elif flattenMethod == AFMFlatteningMethod.TerraceLine:
-            imagePack = _terrace_lineFlattening(imagePack, **kwargs)
-        elif flattenMethod == AFMFlatteningMethod.FacetLevelTiltPlane:
-            imagePack = _facet_Level_Tilt_planeFlattening(imagePack, **kwargs)
-        elif flattenMethod == AFMFlatteningMethod.ThreePointPlane:
-            imagePack = _three_Point_planeFlattening(imagePack, **kwargs)
-        elif flattenMethod == AFMFlatteningMethod.polynomialPlaneFlattening:
-            imagePack = _polynomialPlaneFlattening(imagePack, **kwargs)
-        elif flattenMethod == AFMFlatteningMethod.TerracePlanes:
-            imagePack = _terrace_planeFlattening(imagePack, **kwargs)
-        elif flattenMethod == AFMFlatteningMethod.Zero:
-            imagePack = ZeroImage(imagePack, **kwargs)
-        elif flattenMethod == AFMFlatteningMethod.ZeroImageToFloor:
-            imagePack = ZeroImageToFloor(imagePack, **kwargs)
-
-    # Copy imagepack to a new variable, then add the flattened image
-     
-    return imagePack
+   
 
 
 def ZeroImage(image: FlammarionImageData, mask:np.array=None ):
@@ -1124,17 +1070,15 @@ def ZeroImageToFloor(image: FlammarionImageData  , mask:np.array=None)-> Flammar
     else:
         hist_smooth = hist
     
-    # Normalize the histogram
-    hist_norm = hist_smooth / np.sum(hist_smooth)
+    hist_max = np.max(hist_smooth)*peak_prominence
     
     # Find peaks in the histogram
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-    peak_indices, _ = find_peaks(hist_norm, height=peak_prominence, prominence=peak_prominence)
+    peak_indices, _ = find_peaks(hist_smooth, height=hist_max)
 
     # Check if peaks were found
     if len(peak_indices) == 0:
-        # No peaks found, just return original image
-        floor_level = 0
+        return image
     else:
         peak_positions = bin_centers[peak_indices]
         # Find the peak with the lowest height value (not intensity, but actual z-height)
@@ -1145,3 +1089,49 @@ def ZeroImageToFloor(image: FlammarionImageData  , mask:np.array=None)-> Flammar
     image.data = img_array - floor_level
     image.processingHistory.append(f"ZeroImageToFloor: Subtracted {floor_level} from image to set floor level to zero.")
     return image
+
+ 
+flattening_functions = {
+    AFMFlatteningMethod.PlaneLevel: _planeLevelFlattening,
+    AFMFlatteningMethod.MedianLine: _median_lineFlattening,
+    AFMFlatteningMethod.TrimmedMeanLine: _trimmed_mean_lineFlattening,
+    AFMFlatteningMethod.TrimmedMeanOfDifferenceLine: _trimmed_mean_of_difference_lineFlattening,
+    AFMFlatteningMethod.MedianOfDifferenceLine: _median_Of_Difference_lineFlattening,
+    AFMFlatteningMethod.ModusLine: _modus_lineFlattening,
+    AFMFlatteningMethod.MatchingLine: _matching_lineFlattening,
+    AFMFlatteningMethod.PolynomialLine: _polynomial_LineFlattening,
+    AFMFlatteningMethod.TerraceLine: _terrace_lineFlattening,
+    AFMFlatteningMethod.FacetLevelTiltPlane: _facet_Level_Tilt_planeFlattening,
+    AFMFlatteningMethod.ThreePointPlane: _three_Point_planeFlattening,
+    AFMFlatteningMethod.polynomialPlaneFlattening: _polynomialPlaneFlattening,
+    AFMFlatteningMethod.TerracePlanes: _terrace_planeFlattening,
+    AFMFlatteningMethod.Zero: ZeroImage,
+    AFMFlatteningMethod.ZeroFloor: ZeroImageToFloor
+}
+ 
+def FlattenImage(imagePack: FlammarionImageData| FlammarionFile, flattenMethod=AFMFlatteningMethod.PlaneLevel, mask=None, **kwargs):
+    """
+    Apply flattening to an AFM image using the specified method.
+    
+    Args:
+        imagePack (dict): Dictionary containing the AFM image data
+        flattenMethod (AFMFlatteningMethod): Method to use for flattening
+        mask (np.ndarray, optional): Boolean mask where 1 indicates good points to use for flattening
+        **kwargs: Additional parameters specific to the flattening method
+    
+    Returns:
+        dict: Copy of imagePack with flattened image
+    """
+    # Ensure mask is passed to the flattening function if provided
+    if mask is not None:
+        kwargs['mask'] = mask
+    if isinstance(imagePack, FlammarionFile):
+        for key in imagePack:
+            imagePack[key] = FlattenImage(imagePack[key], flattenMethod, mask, **kwargs)
+    elif  isinstance(imagePack, FlammarionImageData):
+        if flattenMethod in flattening_functions:
+            imagePack = flattening_functions[flattenMethod](imagePack, **kwargs)
+        else:
+            raise ValueError(f"Unknown flattening method: {flattenMethod}")
+     
+    return imagePack

@@ -25,6 +25,25 @@ class FlammarionImageData:
         self.processingHistory: list[str] = []
         self.physicalSize:tuple[float,float] = (0.0, 0.0)
         self.physicalSizeUnit:str = "m"
+    def deepCopy(self):
+        """
+        Create a deep copy of the FlammarionImageData object.
+
+        Returns
+        -------
+        FlammarionImageData
+            A new FlammarionImageData object with copied attributes.
+        """
+        new_image = FlammarionImageData()
+        new_image.data = np.copy(self.data)
+        new_image.label = self.label
+        new_image.zunit = self.zunit
+        new_image.direction = self.direction
+        new_image.metaData = self.metaData.copy()
+        new_image.processingHistory = self.processingHistory.copy()
+        new_image.physicalSize = self.physicalSize
+        new_image.physicalSizeUnit = self.physicalSizeUnit
+        return new_image
 
 class FlammarionFile:
     def __init__(self):
@@ -36,6 +55,46 @@ class FlammarionFile:
         self.physicalSize:tuple[float,float] = (0.0, 0.0)
         self.physicalSizeUnit:str = "m"
 
+    def deepCopy(self):
+        """
+        Create a deep copy of the FlammarionFile object.
+
+        Returns
+        -------
+        FlammarionFile
+            A new FlammarionFile object with copied attributes.
+        """
+        new_file = FlammarionFile()
+        new_file.filename = self.filename
+        new_file.datasetName = self.datasetName
+        new_file.images = [img.deepCopy() for img in self.images]
+        new_file.metaData = self.metaData.copy() if self.metaData else None
+        new_file.resolution = self.resolution
+        new_file.physicalSize = self.physicalSize
+        new_file.physicalSizeUnit = self.physicalSizeUnit
+        return new_file
+    
+    def shallowCopy(self, copyImages:bool = True):
+        """
+        Create a shallow copy of the FlammarionFile object.
+
+        Returns
+        -------
+        FlammarionFile
+            A new FlammarionFile object with the same attributes.
+        """
+        new_file = FlammarionFile()
+        new_file.filename = self.filename
+        new_file.datasetName = self.datasetName
+        if copyImages:
+            new_file.images = self.images.copy()
+        else:
+            new_file.images = []
+        new_file.metaData = self.metaData.copy() if self.metaData else None
+        new_file.resolution = self.resolution
+        new_file.physicalSize = self.physicalSize
+        new_file.physicalSizeUnit = self.physicalSizeUnit
+        return new_file
     
     def __getitem__(self, key):
         """
@@ -106,6 +165,48 @@ class FlammarionFile:
         for img in self.images:
             yield img.label + "_" + img.direction
     
+    def __len__(self):
+        """
+        Get the number of images in the file.
+
+        Returns
+        -------
+        int
+            The number of images in the file.
+        """
+        return len(self.images)
+    def addImage(self, image:FlammarionImageData):
+        """
+        Add an image to the file.
+
+        Parameters
+        ----------
+        image : FlammarionImageData
+            The image data to add.
+        """
+        if not isinstance(image, FlammarionImageData):
+            raise TypeError("Value must be a FlammarionImageData object")
+        
+        self.images.append(image)
+    def removeImage(self, key:str):
+        """
+        Remove an image from the file by its key.
+
+        Parameters
+        ----------
+        key : str
+            The key of the image to remove.
+        """
+        for i, img in enumerate(self.images):
+            if img.label + "_" + img.direction == key:
+                del self.images[i]
+                return
+        raise ValueError(f"Image {key} not found")
+    def clearImages(self):
+        """
+        Clear all images from the file.
+        """
+        self.images = []
     def imageKeys(self):
         """
         Get the keys of the images in the file.
