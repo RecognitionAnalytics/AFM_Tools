@@ -1,11 +1,11 @@
  
-from .ImagingTools import *
-from .FileTools import *
+from .FlamFlattening import *
+from .FlamFiles import *
 from .MathTools import *
 
 import inspect
 import types
-from . import ImagingTools as _imaging
+from . import FlamFlattening as _imaging
 
 # Automatically populate __all__ with all functions and classes from AFM_Tools
 # __all__ = [

@@ -35,6 +35,7 @@ setup(
         "numpy>=1.14.0",
         "matplotlib",
         "scipy",
+        "AFMReader",
         "scikit-image",
         "pandas",
         "scikit-learn",

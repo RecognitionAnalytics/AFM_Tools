@@ -1,5 +1,31 @@
-
+import numpy as np
 from numpy.polynomial.polynomial import Polynomial
+
+def SetPrefix(y):
+    y=np.array(y)
+    # Determine best unit prefix for current values
+    y_abs_max = max(abs(y.min()), abs(y.max()))
+    if y_abs_max < 1e-12:
+        scale = 1e15
+        prefix = 'f'
+    if y_abs_max < 1e-9:
+        scale = 1e12
+        prefix = 'p'
+    elif y_abs_max < 1e-6:
+        scale = 1e9
+        prefix = 'n'
+    elif y_abs_max < 1e-3:
+        scale = 1e6
+        prefix = 'μ'
+    elif y_abs_max < 1:
+        scale = 1e3
+        prefix = 'm'
+    else:
+        scale = 1
+        prefix = ''    
+    return scale, prefix
+
+
 
 def fast_polynomial_background(shape, coeffs):
     """Optimized polynomial background calculation."""
