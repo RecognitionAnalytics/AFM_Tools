@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage import  segmentation,  measure
 from matplotlib.colors import Normalize 
-from MathTools import SetPrefix
+from .MathTools import SetPrefix
 from .FileLoaders.FlammarionFile import FlammarionFile, FlammarionImageData
 
 large = 18

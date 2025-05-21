@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import ndimage
-from MathTools import SetPrefix
+from .MathTools import SetPrefix
 import pandas as pd
 from skimage import  segmentation,  measure
 from skimage.filters import threshold_otsu

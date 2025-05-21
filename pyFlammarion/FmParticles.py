@@ -1,6 +1,6 @@
 
 import numpy as np    
-from MathTools import SetPrefix
+from .MathTools import SetPrefix
 import pandas as pd
 from scipy import ndimage as ndi
 from skimage.segmentation import watershed

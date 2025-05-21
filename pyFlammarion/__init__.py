@@ -1,11 +1,14 @@
  
-from .FmFlattening import *
-from .FmFiles import *
+from . import FmFiles
+from . import FmFlattening
+from . import FmMasking
+from . import FmPlotting
+from . import FmParticles
+from . import FmSegmentation
+from . import MathTools
 
-from .MathTools import *
 
 import inspect
 import types
-from . import FmFlattening as _imaging
 
 __version__ = "0.1.1"
